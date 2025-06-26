@@ -10,11 +10,11 @@ pygame.mixer.music.load("sounds/background_music.mp3")
 FPS = 60
 
 info = pygame.display.Info()
-screen_width = info.current_w
-screen_height = info.current_h
-active_screen = 0 #load into background screen [background screen, play screen, option screen]
+screen_width = 1920
+screen_height = 1080
+active_screen = 0 #load into background screen 
  
-screen = pygame.display.set_mode((screen_width, screen_height))
+screen = pygame.display.set_mode((screen_width, screen_height)) 
 clock = pygame.time.Clock()
 running = True
 
