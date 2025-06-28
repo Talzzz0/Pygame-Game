@@ -1,6 +1,7 @@
 import pygame
 import time
 import random
+import json
 
 # pygame setup
 pygame.init()
@@ -18,13 +19,20 @@ screen = pygame.display.set_mode((screen_width, screen_height))
 clock = pygame.time.Clock()
 running = True
 
+with open("data/data.json", "r") as f:
+    data = json.load(f)
+    high_score = data.get("high_score", 0) 
+    music_power = data.get("music_v", 0.5)
+    sound_power = data.get("sound_v", 0.5)
+    skin = data.get("skin", 0)  # Default
+    f.close()
 
 options = {
-    "music_volume": 0.5,
-    "sound_volume": 0.5,
-    "music_knob_x": (screen_width/2),
+    "music_volume": music_power,  # Default to 0.5 if not set
+    "sound_volume": sound_power,  # Default to 0.5 if not set
+    "music_knob_x": (music_power*300 + 810),
     "music_knob_y": (screen_height/2)-15,
-    "sound_knob_x": (screen_width/2),
+    "sound_knob_x": (sound_power*300 + 810),
     "sound_knob_y": (screen_height/2)+85
 }
 
@@ -40,8 +48,6 @@ game_over_sound = pygame.mixer.Sound("sounds/game_over.mp3")
 button_click_sound = pygame.mixer.Sound("sounds/button.mp3")
 
 platforms = []
-high_score = 0
-
 score_font = pygame.font.SysFont("Arial", 72) #font 
 high_score_font = pygame.font.SysFont("Arial", 48)
 
@@ -59,12 +65,15 @@ class Player:
         super().__init__()
         self.image_right = pygame.image.load("assets/player_right.png")
         self.image_left = pygame.image.load("assets/player_left.png")
+        self.image_left_girl = pygame.image.load("assets/player_left_girl.png")
+        self.image_right_girl = pygame.image.load("assets/player_right_girl.png")
         self.rect = self.image_right.get_rect()
         self.rect.center = (screen_width / 2, screen_height / 2)
         self.vel_y = 0
         self.is_alive = True
         self.score = 0
         self.last_keypress = None
+        self.skin = 0
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -93,13 +102,12 @@ class Player:
             for platform in platforms:
                 platform.rect.y += scroll_y
                 self.score += scroll_y
-            create_platforms(platforms)
 
         if self.rect.y >= screen_height:
             self.is_alive = False
 
     def reset(self):
-        self.image = pygame.image.load("assets/player.png")
+        self.image = pygame.image.load("assets/player_right.png")
         self.rect = self.image.get_rect()
         self.rect.center = (screen_width / 2, screen_height / 2)
         self.vel_y = 0
@@ -140,6 +148,14 @@ while running:
     mouse_pos = pygame.mouse.get_pos()
     for event in pygame.event.get():
         if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            with open("data/data.json", "w") as f:
+               data = {
+                    "high_score": high_score,
+                    "music_v": options["music_volume"],
+                    "sound_v": options["sound_volume"],
+                    "skin": skin
+                }
+               json.dump(data, f)
             running = False
 
     if active_screen == 0: #background screen
@@ -150,6 +166,30 @@ while running:
         play_button = pygame.image.load("assets/play_button.png")
         screen.blit(play_button,((screen_width-240)/2,(screen_height-60)/2))
         screen.blit(option_button,((screen_width-240)/2,(screen_height-60)/2+90))
+
+               
+        boy_pos = (600, screen_height - 200)
+        boy_skin = player.image_right.get_rect(topleft=boy_pos)
+        boy_rect = boy_skin.inflate(20, 20)
+        if skin == 0:
+            pygame.draw.rect(screen, (0, 0, 0), boy_rect, width=10)
+        screen.blit(player.image_right, boy_pos)
+
+        girl_pos = (1200, screen_height - 200)
+        girl_skin = player.image_left_girl.get_rect(topleft=girl_pos)
+        girl_rect = girl_skin.inflate(20, 20)
+        if skin == 1:
+            pygame.draw.rect(screen, (0,0,0), girl_rect, width=10)
+        screen.blit(player.image_left_girl, girl_pos)
+
+        if girl_rect.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed()[0]:
+            skin = 1
+            button_click_sound.play()
+            time.sleep(0.25)
+        if boy_rect.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed()[0]:
+            skin = 0
+            button_click_sound.play()
+            time.sleep(0.25)
 
         if mouse_pos[0] > (screen_width-240)/2 and mouse_pos[0] < (screen_width+240)/2 and mouse_pos[1] > (screen_height-60)/2 and mouse_pos[1] < (screen_height+60)/2:
             play_button_hover = pygame.image.load("assets/play_button_hovered.png")
@@ -191,7 +231,8 @@ while running:
         if music_slider.collidepoint(mouse_pos): #music slder
             if pygame.mouse.get_pressed()[0]:
                 music_volume = (mouse_pos[0] - slider_x) / slider_width
-                options["music_volume"] = pygame.mixer.music.set_volume(music_volume)
+                options["music_volume"] =  music_volume
+                pygame.mixer.music.set_volume(music_volume)
                 options["music_knob_x"] = mouse_pos[0]-10
 
         if volume_slider.collidepoint(mouse_pos): #sound slider
@@ -213,21 +254,31 @@ while running:
                 active_screen = 0
 
     if active_screen == 1: #play screen
+        create_platforms(platforms)
         screen.blit(game_background, (0, 0))
         score_on_board = score_font.render(str(int(player.score//100)), True, (255, 255, 255))
         high_score_on_board = high_score_font.render(str(int(high_score//100)), True, (255, 255, 255))
         screen.blit(score_on_board, (0,0))
         screen.blit(high_score_on_board, (0,60))
 
-        if player.last_keypress == 'left':
-            screen.blit(player.image_left, player.rect.topleft)
-        else:
-            screen.blit(player.image_right, player.rect.topleft)
+        if skin == 0: #boy skin
+            if player.last_keypress == 'left':
+                screen.blit(player.image_left, player.rect.topleft)
+            else:
+                screen.blit(player.image_right, player.rect.topleft)
+
+        if skin == 1: #girl skin
+            if player.last_keypress == 'left':
+                screen.blit(player.image_left_girl, player.rect.topleft)
+            else:
+                screen.blit(player.image_right_girl, player.rect.topleft)
 
         for platform in platforms:
             if platform.rect.y <= screen_height and platform.rect.y >= 0:
                 screen.blit(platform.image, platform.rect.topleft)
         player.update()
+        if player.score > high_score:
+            high_score = player.score
 
 
         if not player.is_alive:
@@ -238,8 +289,6 @@ while running:
             pygame.display.flip()  
             time.sleep(2)
             pygame.mixer.music.play(-1)
-            if player.score > high_score:
-                high_score = player.score
             player.score = 0
             starter_platform = Platform(screen_width/2-50, 920, 100, 20)
             platforms.append(starter_platform)
